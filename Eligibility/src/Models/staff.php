@@ -95,65 +95,92 @@ public function getAttemptDetails($attemptId) {
     return $stmt->fetchAll();
 }
 
+// In src/Models/Staff.php
+
+// In src/Models/Staff.php
+
+// In src/Models/Staff.php
+
 public function saveAndFinalizeGrades($attemptId, $grades) {
-    // Start a transaction to ensure all queries succeed or none do.
-    $this->db->beginTransaction();
-    $totalScore = 0;
-    
+    // --- PHASE 1: READ ALL DATA FROM DATABASE ---
+    // We fetch everything we need first, before any calculations or writes.
     try {
-        // Step 1: Update the manually entered marks for short-answer questions.
-        $stmt_update = $this->db->prepare(
-            "UPDATE student_answers SET marks_awarded = ? WHERE attempt_id = ? AND question_id = ?"
-        );
-        foreach ($grades as $question_id => $marks) {
-            $stmt_update->execute([$marks, $attemptId, $question_id]);
-        }
-        
-        // Step 2: Recalculate the entire score from scratch.
-        $stmt_calc = $this->db->prepare("
+        $stmt_test = $this->db->prepare("SELECT t.settings FROM tests t JOIN student_test_attempts sta ON t.id = sta.test_id WHERE sta.id = ?");
+        $stmt_test->execute([$attemptId]);
+        $testSettings = json_decode($stmt_test->fetchColumn(), true);
+        $negativeMarkingEnabled = isset($testSettings['enable_negative_marking']) && $testSettings['enable_negative_marking'];
+
+        $stmt_answers = $this->db->prepare("
             SELECT 
+                q.id as question_id,
                 q.points, 
-                sa.selected_option_id, 
-                sa.marks_awarded,
+                q.negative_points,
+                q.question_type,
+                sa.selected_option_id,
                 (SELECT id FROM question_options WHERE question_id = q.id AND is_correct = 1) as correct_option_id
             FROM student_answers sa
             JOIN questions q ON sa.question_id = q.id
             WHERE sa.attempt_id = ?
         ");
-        $stmt_calc->execute([$attemptId]);
-        $all_answers_for_attempt = $stmt_calc->fetchAll();
+        $stmt_answers->execute([$attemptId]);
+        $all_answers = $stmt_answers->fetchAll();
 
-        // Loop through every answer to calculate the total score.
-        foreach ($all_answers_for_attempt as $answer) {
-            if ($answer['correct_option_id'] !== null) { 
-                // This is a Multiple Choice Question.
-                if ($answer['selected_option_id'] == $answer['correct_option_id']) {
-                    // Award full points if the answer is correct.
-                    $totalScore += $answer['points'];
-                }
-            } else { 
-                // This is a Short Answer Question.
-                // Add the manually entered marks.
-                $totalScore += $answer['marks_awarded'];
+    } catch (Exception $e) {
+        die("<h1>Database Error during data fetch!</h1><pre>" . $e->getMessage() . "</pre>");
+    }
+
+    // --- PHASE 2: PERFORM ALL CALCULATIONS PURELY IN PHP ---
+    $totalScore = 0;
+    $marksToUpdateInDB = []; // This will store the final mark for EVERY question.
+
+    foreach ($all_answers as $answer) {
+        $questionId = $answer['question_id'];
+
+        if ($answer['question_type'] === 'multiple_choice') {
+            // Use strict, type-safe comparison for IDs
+            if ((int)$answer['selected_option_id'] === (int)$answer['correct_option_id']) {
+                $totalScore += $answer['points'];
+                $marksToUpdateInDB[$questionId] = $answer['points'];
+            } else if ($negativeMarkingEnabled) {
+                $totalScore -= $answer['negative_points'];
+                $marksToUpdateInDB[$questionId] = -$answer['negative_points'];
+            } else {
+                $marksToUpdateInDB[$questionId] = 0;
+            }
+        } else { // This is a Short Answer question
+            // Use the mark from the form ($grades array) as the source of truth.
+            $awardedMark = isset($grades[$questionId]) ? (float)$grades[$questionId] : 0;
+            $totalScore += $awardedMark;
+            $marksToUpdateInDB[$questionId] = $awardedMark;
+        }
+    }
+
+    // --- PHASE 3: WRITE ALL RESULTS TO THE DATABASE ---
+    $this->db->beginTransaction();
+    try {
+        // Update the 'marks_awarded' for every single question based on our PHP calculation.
+        if (!empty($marksToUpdateInDB)) {
+            $stmt_update_marks = $this->db->prepare(
+                "UPDATE student_answers SET marks_awarded = ? WHERE attempt_id = ? AND question_id = ?"
+            );
+            foreach ($marksToUpdateInDB as $qid => $mark) {
+                $stmt_update_marks->execute([$mark, $attemptId, $qid]);
             }
         }
         
-        // Step 3: Update the main attempt record with the final score and new status.
+        // Update the final total score in the main attempts table.
         $stmt_final = $this->db->prepare(
-            "UPDATE student_test_attempts SET score = ?, status = 'graded' WHERE id = ?"
+            "UPDATE student_test_attempts SET score = ?, status = 'graded', graded_by = ? WHERE id = ?"
         );
-        $stmt_final->execute([$totalScore, $attemptId]);
+        $staffId = Session::get('user_id'); 
+        $stmt_final->execute([$totalScore, $staffId, $attemptId]);
 
-        // If all queries were successful, save the changes to the database.
         $this->db->commit();
         return true;
 
     } catch (Exception $e) {
-        // If any query failed, undo all changes from this transaction.
         $this->db->rollBack();
-        
-        // This is the debugging code that should show the REAL error.
-        die("<h1>A new error was found!</h1><p><b>Please copy this entire message and paste it in your reply.</b></p><pre>Database Error: " . $e->getMessage() . "</pre>");
+        die("<h1>Database Error during final save!</h1><pre>" . $e->getMessage() . "</pre>");
     }
 }
 }

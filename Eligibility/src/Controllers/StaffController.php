@@ -1,6 +1,6 @@
 <?php
 // src/Controllers/StaffController.php
-require_once __DIR__ . '/../Models/staff.php';
+require_once __DIR__ . '/../Models/Staff.php';
 require_once __DIR__ . '/../Models/Question.php';
 require_once __DIR__ . '/../Models/Test.php';
 require_once __DIR__ . '/../Core/Session.php';

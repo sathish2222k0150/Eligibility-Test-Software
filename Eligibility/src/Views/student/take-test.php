@@ -40,7 +40,11 @@
       ?>
 
       <form id="test-form" action="index.php?action=submit-test" method="post">
+        <?php
+        $is_one_per_page = isset($test['settings']['one_question_per_page']) && $test['settings']['one_question_per_page'];
+        ?>
         <?php foreach($questions as $index => $q): ?>
+          <div class="question-page" id="page-<?php echo $index; ?>"> 
         <div class="card card-info card-outline mb-4">
           <div class="card-header">
             <h5 class="card-title">Question <?php echo $index + 1; ?></h5>
@@ -64,8 +68,12 @@
             <?php endif; ?>
           </div>
         </div>
+        </div>
         <?php endforeach; ?>
-        
+        <div class="d-flex justify-content-between mb-5">
+        <button type="button" id="prev-btn" class="btn btn-secondary btn-lg" onclick="prevPage()" <?php if(!$is_one_per_page) echo 'style="display:none;"'; ?>>Previous</button>
+        <button type="button" id="next-btn" class="btn btn-info btn-lg" onclick="nextPage()" <?php if(!$is_one_per_page) echo 'style="display:none;"'; ?>>Next</button>
+      </div>
         <div class="card-footer bg-light text-center">
             <button type="submit" class="btn btn-success btn-lg px-5">Submit Test</button>
         </div>
@@ -128,6 +136,54 @@
       });
   }
 </script>
+<script>
+    // --- ADD THIS NEW PAGINATION SCRIPT ---
+    const isOnePerPage = <?php echo json_encode($is_one_per_page); ?>;
+    const totalPages = <?php echo count($questions); ?>;
+    let currentPage = 0;
 
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+
+    function showPage(pageIndex) {
+      // Hide all pages
+      document.querySelectorAll('.question-page').forEach(page => {
+        page.style.display = 'none';
+      });
+      // Show the current page
+      document.getElementById('page-' + pageIndex).style.display = 'block';
+
+      // Update button visibility
+      prevBtn.disabled = (pageIndex === 0);
+      nextBtn.style.display = (pageIndex === totalPages - 1) ? 'none' : 'inline-block';
+      submitBtn.style.display = (pageIndex === totalPages - 1) ? 'inline-block' : 'none';
+    }
+
+    function nextPage() {
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        showPage(currentPage);
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 0) {
+        currentPage--;
+        showPage(currentPage);
+      }
+    }
+    
+    // Initialize the view
+    if (isOnePerPage) {
+      showPage(0);
+    } else {
+      // If not one-per-page, show all questions
+      document.querySelectorAll('.question-page').forEach(page => {
+        page.style.display = 'block';
+      });
+    }
+    // --- END OF PAGINATION SCRIPT ---
+  </script>
 </body>
 </html>

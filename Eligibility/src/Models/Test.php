@@ -74,6 +74,7 @@ public function getDetailsById($testId) {
 }
 
 public function getQuestionsForTest($testId) {
+    $test = $this->findById($testId);
     $sql = "
         SELECT q.* 
         FROM questions q
@@ -83,6 +84,13 @@ public function getQuestionsForTest($testId) {
     $stmt = $this->db->prepare($sql);
     $stmt->execute([$testId]);
     $questions = $stmt->fetchAll();
+
+    // --- RANDOMIZATION LOGIC ---
+    // If the setting is enabled, shuffle the array of questions
+    if ($test && isset($test['settings']['randomize_questions']) && $test['settings']['randomize_questions']) {
+        shuffle($questions);
+    }
+    // --- END OF LOGIC ---
 
     // For MCQs, fetch their options
     foreach ($questions as $key => $q) {

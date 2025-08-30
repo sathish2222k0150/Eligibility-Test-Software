@@ -44,7 +44,7 @@
 
 <?php include __DIR__ . '/../layouts/admin-footer.php'; ?>
 <!-- ADD ChartJS SCRIPT -->
-<script src="public/assets/plugins/chart.js/Chart.min.js"></script>
+<script src="assets/plugins/chart.js/Chart.min.js"></script>
 <script>
 $(function () {
   var chartData = <?php echo json_encode($chart_data); ?>;
@@ -84,9 +84,37 @@ $(function () {
     ]
   };
   var attemptsChart = new Chart(attemptsChartCanvas, {
-    type: 'bar',
-    data: attemptsChartData,
-    options: { maintainAspectRatio: false, responsive: true }
-  });
+  type: 'line',
+  data: attemptsChartData,
+  options: { 
+    maintainAspectRatio: false, 
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1   // ensures whole numbers for attempts
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top'
+      }
+    },
+    elements: {
+      line: {
+        tension: 0.3,         // smooth curve (0 = straight lines)
+        borderWidth: 3
+      },
+      point: {
+        radius: 5,
+        backgroundColor: 'rgba(60,141,188,1)',
+        borderWidth: 2
+      }
+    }
+  }
+});
 });
 </script>

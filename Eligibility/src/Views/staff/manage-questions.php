@@ -113,6 +113,12 @@
               </div>
             </div>
             <div class="col-md-6">
+              <div class="form-group">
+                <label>Negative Points for Incorrect</label>
+                <input type="number" name="negative_points" class="form-control" value="0" min="0" step="0.25" required>
+              </div>
+            </div>
+            <div class="col-md-6">
               <!-- NEW: Difficulty Field -->
               <div class="form-group">
                 <label>Difficulty</label>
@@ -193,7 +199,18 @@
             <textarea name="question_text" id="edit_question_text" class="form-control" rows="3" required></textarea>
           </div>
           <div class="row">
-            <div class="col-md-6"><div class="form-group"><label>Points</label><input type="number" name="points" id="edit_points" class="form-control" required></div></div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Points</label>
+                <input type="number" name="points" id="edit_points" class="form-control" required>
+              </div>
+            </div>
+            <div class="col-md-6">
+            <div class="form-group">
+              <label>Negative Points for Incorrect</label>
+              <input type="number" name="negative_points" class="form-control" value="0" min="0" step="0.25" required>
+            </div>
+          </div>
             <div class="col-md-6"><div class="form-group"><label>Difficulty</label>
             <select name="difficulty" id="edit_difficulty" class="form-control" required>
             <option value="easy">Easy</option>
@@ -263,6 +280,7 @@ $(document).ready(function() {
         $('#edit_question_type').val(response.question_type);
         $('#edit_question_text').val(response.question_text);
         $('#edit_points').val(response.points);
+        $('#edit_negative_points').val(response.negative_points);
         $('#edit_difficulty').val(response.difficulty);
         
         // Handle MCQ options

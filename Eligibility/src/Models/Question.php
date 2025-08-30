@@ -20,39 +20,54 @@ class Question {
         return $stmt->fetchAll();
     }
 
-    public function create($data, $attachmentPath = null) { // Add $attachmentPath parameter
+    // In src/Models/Question.php
+
+public function create($data, $attachmentPath = null) {
     $this->db->beginTransaction();
     try {
-        // Add 'difficulty' and 'attachment_path' to the SQL query
-        $sql = "INSERT INTO questions (course_id, staff_id, question_text, question_type, points, difficulty, attachment_path) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        // --- THIS IS THE FIX ---
+        // The SQL query now includes the 'negative_points' column.
+        $sql = "INSERT INTO questions 
+                    (course_id, staff_id, question_text, question_type, points, negative_points, difficulty, attachment_path) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        
         $stmt = $this->db->prepare($sql);
+        
+        // The execute array now includes the value from the new form field.
         $stmt->execute([
             $data['course_id'],
             $data['staff_id'],
             $data['question_text'],
             $data['question_type'],
             $data['points'],
-            $data['difficulty'],    // New field
-            $attachmentPath         // New field
+            $data['negative_points'], // <-- Added this line
+            $data['difficulty'],
+            $attachmentPath
         ]);
         $questionId = $this->db->lastInsertId();
 
+        // The rest of the function for handling MCQ options remains the same.
         if ($data['question_type'] === 'multiple_choice') {
             $sql_option = "INSERT INTO question_options (question_id, option_text, is_correct) VALUES (?, ?, ?)";
             $stmt_option = $this->db->prepare($sql_option);
             
             foreach ($data['options'] as $index => $optionText) {
                 if (!empty($optionText)) {
-                    $isCorrect = ($data['is_correct'] == $index) ? 1 : 0;
+                    // Add a check for is_correct to avoid errors if no radio is selected
+                    $isCorrect = (isset($data['is_correct']) && $data['is_correct'] == $index) ? 1 : 0;
                     $stmt_option->execute([$questionId, $optionText, $isCorrect]);
                 }
             }
         }
+        
         $this->db->commit();
         return true;
     } catch (Exception $e) {
         $this->db->rollBack();
-        // For debugging, you can temporarily add: die($e->getMessage());
+        
+        // Temporarily enable this line if the problem persists to see the real error
+        // die("Database Error in Question::create(): " . $e->getMessage()); 
+        
         return false;
     }
 }
@@ -80,12 +95,13 @@ public function update($data, $attachmentPath = null) {
     $this->db->beginTransaction();
     try {
         // Update the main question details
-        $sql = "UPDATE questions SET course_id = ?, question_text = ?, question_type = ?, points = ?, difficulty = ?";
+        $sql = "UPDATE questions SET course_id = ?, question_text = ?, question_type = ?, points = ?, negative_points = ?, difficulty = ?";
         $params = [
             $data['course_id'],
             $data['question_text'],
             $data['question_type'],
             $data['points'],
+            $data['negative_points'],
             $data['difficulty'],
         ];
 
